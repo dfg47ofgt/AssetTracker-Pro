@@ -4,6 +4,7 @@ import { StatCard } from './StatCard';
 import { analyzePortfolioWithGemini } from '../services/geminiService';
 import { ArrowUpRight, ArrowDownRight, Wallet, TrendingUp, Sparkles, PieChart as PieChartIcon, Coins } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
+import type { TooltipProps } from 'recharts';
 
 interface DashboardProps {
   deposits: DepositRecord[];
@@ -100,18 +101,33 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setIsLoadingAi(false);
   };
 
-  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+  const renderCustomizedLabel = ({ cx, cy, midAngle, outerRadius, percent, name }: any) => {
     const RADIAN = Math.PI / 180;
-    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const offsetRadius = outerRadius + 18;
+    const radius = offsetRadius;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
   
     if (percent < 0.05) return null;
+    const percentage = `${(percent * 100).toFixed(0)}%`;
   
     return (
-      <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={12} fontWeight="bold">
-        {`${(percent * 100).toFixed(0)}%`}
+      <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="middle" fontSize={12} fontWeight="bold">
+        <tspan x={x} dy="-0.2em">{name || ''}</tspan>
+        <tspan x={x} dy="1.2em">{percentage}</tspan>
       </text>
+    );
+  };
+
+  const renderAllocationTooltip = (props: TooltipProps<number, string>) => {
+    if (!props.active || !('payload' in props) || !Array.isArray(props.payload) || props.payload.length === 0) {
+      return null;
+    }
+    const datum = props.payload[0];
+    return (
+      <div className="rounded-lg border border-slate-700 bg-slate-900/90 px-3 py-2 text-xs font-semibold text-white">
+        {`${currencySymbol}${Number(datum.value || 0).toLocaleString()}`}
+      </div>
     );
   };
 
@@ -230,11 +246,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="rgba(15, 23, 42, 1)" strokeWidth={2} />
                             ))}
                         </Pie>
-                        <Tooltip 
-                              contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px', color: '#f8fafc' }}
-                              itemStyle={{ color: '#f8fafc' }}
-                              formatter={(value: number) => [`${currencySymbol}${value.toLocaleString()}`, '價值']}
-                          />
+                        <Tooltip content={renderAllocationTooltip} />
                         <Legend 
                             verticalAlign="bottom" 
                             height={80}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PlatformBalances, Asset } from '../types';
 import { Save, Wallet, Plus, Trash2, Coins, Settings, AlertTriangle, X, Check } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import type { TooltipProps } from 'recharts';
 
 interface AssetSectionProps {
   balances: PlatformBalances;
@@ -16,16 +17,18 @@ interface AssetSectionProps {
 const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#ef4444', '#6366f1', '#14b8a6', '#f97316'];
 const RADIAN = Math.PI / 180;
 
-const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
-  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+const renderCustomizedLabel = ({ cx, cy, midAngle, outerRadius, percent, name }: any) => {
+  const radius = outerRadius + 18;
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
   const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
   if (percent < 0.05) return null;
+  const percentage = `${(percent * 100).toFixed(0)}%`;
 
   return (
-    <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={12} fontWeight="bold">
-      {`${(percent * 100).toFixed(0)}%`}
+    <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="middle" fontSize={12} fontWeight="bold">
+      <tspan x={x} dy="-0.2em">{name || ''}</tspan>
+      <tspan x={x} dy="1.2em">{percentage}</tspan>
     </text>
   );
 };
@@ -39,6 +42,19 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
     currencySymbol = '$',
     assetLabel = '幣種'
 }) => {
+    const renderPieTooltip = (props: TooltipProps<number, string>) => {
+      if (!props.active || !('payload' in props) || !Array.isArray(props.payload) || props.payload.length === 0) {
+        return null;
+      }
+      const payload = props.payload;
+      const datum = payload[0];
+      return (
+        <div className="rounded-lg border border-slate-700 bg-slate-900/90 px-3 py-2 text-xs font-semibold text-white">
+          {`${currencySymbol}${Number(datum.value || 0).toLocaleString()}`}
+        </div>
+      );
+    };
+
   const [localBalances, setLocalBalances] = useState<PlatformBalances>(balances);
   const [isDirty, setIsDirty] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -393,11 +409,7 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
                                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="rgba(15, 23, 42, 1)" strokeWidth={2} />
                               ))}
                           </Pie>
-                          <Tooltip 
-                              contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px', color: '#f8fafc' }}
-                              itemStyle={{ color: '#f8fafc' }}
-                              formatter={(value: number) => [`${currencySymbol}${value.toLocaleString()}`, '價值']}
-                          />
+                            <Tooltip content={renderPieTooltip} />
                           <Legend 
                             verticalAlign="bottom" 
                             height={80}
@@ -443,11 +455,7 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
                                   <Cell key={`cell-${index}`} fill={COLORS[(index + 3) % COLORS.length]} stroke="rgba(15, 23, 42, 1)" strokeWidth={2} />
                               ))}
                           </Pie>
-                          <Tooltip 
-                              contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px', color: '#f8fafc' }}
-                              itemStyle={{ color: '#f8fafc' }}
-                              formatter={(value: number) => [`${currencySymbol}${value.toLocaleString()}`, '價值']}
-                          />
+                            <Tooltip content={renderPieTooltip} />
                           <Legend 
                             verticalAlign="bottom" 
                             height={80}
