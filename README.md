@@ -10,11 +10,14 @@ View your app in AI Studio: https://ai.studio/apps/drive/1p_fcn9gJiunyid_blplhuq
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
+**Prerequisites:**  Node.js 18+
 
+1. Install dependencies: `npm install`
+2. Create or edit `.env` and set `GEMINI_API_KEY`
+3. Start the dev server: `npm run dev`
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Data Persistence
+
+- Runtime state (users, deposits, balances, history) is stored in `data/appData.json` through the built-in Vite middleware.
+- The app will bootstrap the file automatically if it is missing; ensure the `data` directory is writable before starting the server.
+- Changes made through the UI are written to disk instantly. Commit or back up `data/appData.json` if you want to preserve the dataset.

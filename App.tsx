@@ -1,105 +1,227 @@
-import React, { useState, useEffect } from 'react';
-import { UserProfile, InvestmentType } from './types';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { UserProfile, InvestmentType, AppData, DepositRecord, PlatformBalances, AssetHistoryRecord } from './types';
 import { MainApp } from './components/MainApp';
-import { Users, UserPlus, ArrowRight, Coins, TrendingUp, CandlestickChart, Globe, Sparkles } from 'lucide-react';
+import { UserPlus, ArrowRight, Coins, TrendingUp, CandlestickChart, Globe, Sparkles } from 'lucide-react';
+import { loadAppData, saveAppData } from './services/dataService';
+import { createDefaultBalances } from './constants';
+import { EMPTY_APP_DATA, normalizeAppData } from './shared/appDataDefaults';
 
-const STORAGE_KEY_USERS = 'crypto_users';
+const StatusBanner: React.FC<{ loadWarning: string | null; saveError: string | null; isSaving: boolean }> = ({ loadWarning, saveError, isSaving }) => {
+  const message = saveError ?? (isSaving ? '資料儲存中…' : loadWarning);
+  if (!message) {
+    return null;
+  }
 
-// Legacy keys to check for data migration
-const LEGACY_DEPOSITS = 'crypto_deposits';
-const LEGACY_BALANCES = 'crypto_balances';
-const LEGACY_HISTORY = 'crypto_asset_history';
+  const tone = saveError ? 'error' : isSaving ? 'info' : 'warning';
+  const toneStyle =
+    tone === 'error'
+      ? 'bg-rose-500/20 border-rose-500 text-rose-100'
+      : tone === 'warning'
+        ? 'bg-amber-500/20 border-amber-400 text-amber-100'
+        : 'bg-slate-800/90 border-slate-600 text-slate-100';
+
+  return (
+    <div className="fixed bottom-4 right-4 z-[200] max-w-sm pointer-events-none">
+      <div className={`pointer-events-auto rounded-lg border px-4 py-3 text-sm shadow-xl backdrop-blur ${toneStyle}`}>
+        {message}
+      </div>
+    </div>
+  );
+};
 
 const App: React.FC = () => {
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  
+  const [appData, setAppData] = useState<AppData | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
   // Create User Form State
   const [newUserName, setNewUserName] = useState('');
   const [newUserType, setNewUserType] = useState<InvestmentType>('CRYPTO');
   const [showAddUser, setShowAddUser] = useState(false);
 
-  // Load users and check for migration on mount
+  const [loading, setLoading] = useState(true);
+  const [loadWarning, setLoadWarning] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const hasPersisted = useRef(false);
+
   useEffect(() => {
-    const savedUsers = localStorage.getItem(STORAGE_KEY_USERS);
-    let parsedUsers: UserProfile[] = savedUsers ? JSON.parse(savedUsers) : [];
-
-    // --- MIGRATION LOGIC START ---
-    if (parsedUsers.length === 0) {
-      const hasLegacyData = localStorage.getItem(LEGACY_DEPOSITS) !== null;
-      
-      if (hasLegacyData) {
-        const defaultUser: UserProfile = {
-          id: 'default_user',
-          name: '預設使用者',
-          createdAt: Date.now(),
-          investmentType: 'CRYPTO',
-          currency: 'USDT'
-        };
-        parsedUsers = [defaultUser];
-        
-        const d = localStorage.getItem(LEGACY_DEPOSITS);
-        const b = localStorage.getItem(LEGACY_BALANCES);
-        const h = localStorage.getItem(LEGACY_HISTORY);
-
-        if (d) localStorage.setItem(`crypto_deposits_${defaultUser.id}`, d);
-        if (b) localStorage.setItem(`crypto_balances_${defaultUser.id}`, b);
-        if (h) localStorage.setItem(`crypto_asset_history_${defaultUser.id}`, h);
-
-        console.log("Migrated legacy data to default user.");
+    let isActive = true;
+    (async () => {
+      try {
+        const result = await loadAppData();
+        if (!isActive) return;
+        setAppData(result.data);
+        if (result.isFallback) {
+          setLoadWarning('載入資料檔案時發生問題，已使用預設資料。');
+        }
+      } catch (error) {
+        console.error('Unexpected error while loading data', error);
+        if (!isActive) return;
+        setLoadWarning('無法讀取資料檔案，請確認 data 目錄是否可用。');
+        setAppData(normalizeAppData(EMPTY_APP_DATA));
+      } finally {
+        if (isActive) {
+          setLoading(false);
+        }
       }
-    }
-    // --- MIGRATION LOGIC END ---
+    })();
 
-    setUsers(parsedUsers);
+    return () => {
+      isActive = false;
+    };
   }, []);
 
-  // Save users list whenever it changes
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
-  }, [users]);
+    if (!appData) return;
+    if (!hasPersisted.current) {
+      hasPersisted.current = true;
+      return;
+    }
+
+    let cancelled = false;
+    setIsSaving(true);
+
+    saveAppData(appData)
+      .then(() => {
+        if (cancelled) return;
+        setSaveError(null);
+      })
+      .catch((error) => {
+        console.error('Failed to persist data', error);
+        if (cancelled) return;
+        setSaveError('儲存資料時發生錯誤，請檢查 data 目錄是否可寫。');
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsSaving(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [appData]);
+
+  const users = useMemo(() => appData?.users ?? [], [appData]);
+  const currentUser = useMemo(() => users.find((user) => user.id === currentUserId) ?? null, [users, currentUserId]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    if (!users.some((user) => user.id === currentUserId)) {
+      setCurrentUserId(null);
+    }
+  }, [users, currentUserId]);
 
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!appData) return;
     if (!newUserName.trim()) return;
 
-    // Determine currency based on type
+    const type = newUserType;
     let currency = 'USDT';
-    if (newUserType === 'TW_STOCK') currency = 'TWD';
-    if (newUserType === 'US_STOCK') currency = 'USD';
+    if (type === 'TW_STOCK') currency = 'TWD';
+    if (type === 'US_STOCK') currency = 'USD';
 
     const newUser: UserProfile = {
       id: 'u_' + Date.now().toString(36),
       name: newUserName.trim(),
       createdAt: Date.now(),
-      investmentType: newUserType,
-      currency: currency
+      investmentType: type,
+      currency
     };
 
-    setUsers(prev => [...prev, newUser]);
+    setAppData((prev) => {
+      const base = prev ?? normalizeAppData(EMPTY_APP_DATA);
+      return {
+        ...base,
+        users: [...base.users, newUser],
+        deposits: { ...base.deposits, [newUser.id]: [] },
+        balances: { ...base.balances, [newUser.id]: createDefaultBalances(type) },
+        history: { ...base.history, [newUser.id]: [] }
+      };
+    });
+
     setNewUserName('');
     setNewUserType('CRYPTO');
     setShowAddUser(false);
   };
 
-  // Handle deleting the current user (passed to MainApp)
   const handleDeleteAccount = (userId: string) => {
-    setUsers(prevUsers => prevUsers.filter(u => u.id !== userId));
-    
-    // Clean up their data
-    localStorage.removeItem(`crypto_deposits_${userId}`);
-    localStorage.removeItem(`crypto_balances_${userId}`);
-    localStorage.removeItem(`crypto_asset_history_${userId}`);
-    
-    setCurrentUser(null);
+    setAppData((prev) => {
+      if (!prev) return prev;
+      const updatedUsers = prev.users.filter((user) => user.id !== userId);
+      if (updatedUsers.length === prev.users.length) return prev;
+
+      const next: AppData = {
+        ...prev,
+        users: updatedUsers,
+        deposits: { ...prev.deposits },
+        balances: { ...prev.balances },
+        history: { ...prev.history }
+      };
+
+      delete next.deposits[userId];
+      delete next.balances[userId];
+      delete next.history[userId];
+
+      return next;
+    });
+
+    if (currentUserId === userId) {
+      setCurrentUserId(null);
+    }
   };
 
   const handleLogin = (user: UserProfile) => {
-    setCurrentUser(user);
+    setCurrentUserId(user.id);
   };
 
   const handleLogout = () => {
-    setCurrentUser(null);
+    setCurrentUserId(null);
+  };
+
+  const handleUserDataChange = (
+    userId: string,
+    changes: {
+      deposits?: DepositRecord[];
+      balances?: PlatformBalances;
+      assetHistory?: AssetHistoryRecord[];
+    }
+  ) => {
+    setAppData((prev) => {
+      if (!prev) return prev;
+
+      let didChange = false;
+      let deposits = prev.deposits;
+      let balances = prev.balances;
+      let history = prev.history;
+
+      if (changes.deposits) {
+        deposits = { ...deposits, [userId]: changes.deposits };
+        didChange = true;
+      }
+
+      if (changes.balances) {
+        balances = { ...balances, [userId]: changes.balances };
+        didChange = true;
+      }
+
+      if (changes.assetHistory) {
+        history = { ...history, [userId]: changes.assetHistory };
+        didChange = true;
+      }
+
+      if (!didChange) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        deposits,
+        balances,
+        history
+      };
+    });
   };
 
   const getTypeLabel = (type?: InvestmentType) => {
@@ -126,14 +248,37 @@ const App: React.FC = () => {
     }
   };
 
-  if (currentUser) {
+  if (loading || !appData) {
     return (
-        <MainApp 
-            key={currentUser.id} 
-            currentUser={currentUser} 
-            onLogout={handleLogout} 
-            onDeleteAccount={() => handleDeleteAccount(currentUser.id)}
+      <div className="min-h-screen bg-black text-slate-100 flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <TrendingUp className="w-10 h-10 mx-auto text-emerald-400 animate-pulse" />
+          <p className="text-sm text-slate-400 tracking-widest uppercase">資料載入中…</p>
+        </div>
+        <StatusBanner loadWarning={loadWarning} saveError={saveError} isSaving={isSaving} />
+      </div>
+    );
+  }
+
+  if (currentUser) {
+    const userDeposits = appData.deposits[currentUser.id] ?? [];
+    const userBalances = appData.balances[currentUser.id] ?? createDefaultBalances(currentUser.investmentType || 'CRYPTO');
+    const userHistory = appData.history[currentUser.id] ?? [];
+
+    return (
+      <>
+        <MainApp
+          key={currentUser.id}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          onDeleteAccount={() => handleDeleteAccount(currentUser.id)}
+          initialDeposits={userDeposits}
+          initialBalances={userBalances}
+          initialHistory={userHistory}
+          onDataChange={(changes) => handleUserDataChange(currentUser.id, changes)}
         />
+        <StatusBanner loadWarning={loadWarning} saveError={saveError} isSaving={isSaving} />
+      </>
     );
   }
 
@@ -303,6 +448,7 @@ const App: React.FC = () => {
             <p>SECURE ASSET TRACKING SYSTEM v2.0</p>
         </div>
       </div>
+      <StatusBanner loadWarning={loadWarning} saveError={saveError} isSaving={isSaving} />
     </div>
   );
 };

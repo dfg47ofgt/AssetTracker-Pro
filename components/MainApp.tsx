@@ -1,33 +1,39 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { TabView, DepositRecord, PlatformBalances, AssetHistoryRecord, UserProfile, InvestmentType } from '../types';
+import { TabView, DepositRecord, PlatformBalances, AssetHistoryRecord, UserProfile } from '../types';
 import { Dashboard } from './Dashboard';
 import { DepositSection } from './DepositSection';
 import { AssetSection } from './AssetSection';
 import { AssetHistory } from './AssetHistory';
-import { LayoutDashboard, History, Wallet, Coins, LineChart, LogOut, CandlestickChart, Globe, ChevronDown, User, Trash2, AlertTriangle, X } from 'lucide-react';
+import { LayoutDashboard, History, Wallet, Coins, LineChart, LogOut, CandlestickChart, Globe, ChevronDown, Trash2, AlertTriangle, X } from 'lucide-react';
+import { createDefaultBalances } from '../constants';
 
 interface MainAppProps {
   currentUser: UserProfile;
   onLogout: () => void;
   onDeleteAccount: () => void;
+  initialDeposits: DepositRecord[];
+  initialBalances: PlatformBalances;
+  initialHistory: AssetHistoryRecord[];
+  onDataChange: (changes: {
+    deposits?: DepositRecord[];
+    balances?: PlatformBalances;
+    assetHistory?: AssetHistoryRecord[];
+  }) => void;
 }
 
-const DEFAULT_PLATFORMS: Record<string, string[]> = {
-  CRYPTO: ['BingX', 'Bitget', 'Bitget Wallet'],
-  TW_STOCK: ['富邦證卷', '國泰證卷', '永豐證卷'],
-  US_STOCK: ['富邦證卷', '國泰證卷', '凱基證卷']
-};
-
-export const MainApp: React.FC<MainAppProps> = ({ currentUser, onLogout, onDeleteAccount }) => {
+export const MainApp: React.FC<MainAppProps> = ({
+  currentUser,
+  onLogout,
+  onDeleteAccount,
+  initialDeposits,
+  initialBalances,
+  initialHistory,
+  onDataChange
+}) => {
   const [activeTab, setActiveTab] = useState<TabView>(TabView.DASHBOARD);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
-  
-  // Storage Keys based on User ID
-  const STORAGE_KEY_DEPOSITS = `crypto_deposits_${currentUser.id}`;
-  const STORAGE_KEY_BALANCES = `crypto_balances_${currentUser.id}`;
-  const STORAGE_KEY_HISTORY = `crypto_asset_history_${currentUser.id}`;
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -61,58 +67,54 @@ export const MainApp: React.FC<MainAppProps> = ({ currentUser, onLogout, onDelet
   }, [currentUser]);
 
   // State for Deposits
-  const [deposits, setDeposits] = useState<DepositRecord[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_DEPOSITS);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [deposits, setDeposits] = useState<DepositRecord[]>(initialDeposits);
+  useEffect(() => {
+    setDeposits(initialDeposits);
+  }, [initialDeposits]);
 
-  // State for Asset Balances (With Defaults Logic)
+  // State for Asset Balances (with defaults)
   const [balances, setBalances] = useState<PlatformBalances>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_BALANCES);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return parsed;
-    }
-    
-    // Initialize defaults if empty
-    const defaults = DEFAULT_PLATFORMS[currentUser.investmentType || 'CRYPTO'] || DEFAULT_PLATFORMS['CRYPTO'];
-    const initialBalances: PlatformBalances = {};
-    defaults.forEach(p => {
-        initialBalances[p] = [];
-    });
-    return initialBalances;
+    return Object.keys(initialBalances || {}).length > 0
+      ? initialBalances
+      : createDefaultBalances(currentUser.investmentType || 'CRYPTO');
   });
+  useEffect(() => {
+    setBalances(
+      Object.keys(initialBalances || {}).length > 0
+        ? initialBalances
+        : createDefaultBalances(currentUser.investmentType || 'CRYPTO')
+    );
+  }, [initialBalances, currentUser.investmentType]);
 
   // State for Asset History
-  const [assetHistory, setAssetHistory] = useState<AssetHistoryRecord[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_HISTORY);
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Persistence
+  const [assetHistory, setAssetHistory] = useState<AssetHistoryRecord[]>(initialHistory);
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_DEPOSITS, JSON.stringify(deposits));
-  }, [deposits, STORAGE_KEY_DEPOSITS]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_BALANCES, JSON.stringify(balances));
-  }, [balances, STORAGE_KEY_BALANCES]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(assetHistory));
-  }, [assetHistory, STORAGE_KEY_HISTORY]);
+    setAssetHistory(initialHistory);
+  }, [initialHistory]);
 
   // Handlers
   const handleAddDeposit = (deposit: DepositRecord) => {
-    setDeposits((prev) => [...prev, deposit]);
+    setDeposits((prev) => {
+      const updated = [...prev, deposit];
+      onDataChange({ deposits: updated });
+      return updated;
+    });
   };
 
   const handleEditDeposit = (updatedDeposit: DepositRecord) => {
-    setDeposits((prev) => prev.map(d => d.id === updatedDeposit.id ? updatedDeposit : d));
+    setDeposits((prev) => {
+      const updated = prev.map((d) => (d.id === updatedDeposit.id ? updatedDeposit : d));
+      onDataChange({ deposits: updated });
+      return updated;
+    });
   };
 
   const handleDeleteDeposit = (id: string) => {
-    setDeposits((prev) => prev.filter(d => d.id !== id));
+    setDeposits((prev) => {
+      const updated = prev.filter((d) => d.id !== id);
+      onDataChange({ deposits: updated });
+      return updated;
+    });
   };
 
   const calculateTotal = (assets: any[]) => {
@@ -122,7 +124,7 @@ export const MainApp: React.FC<MainAppProps> = ({ currentUser, onLogout, onDelet
 
   const handleUpdateBalances = (newBalances: PlatformBalances) => {
     setBalances(newBalances);
-    
+
     // Auto-save to history on update
     const platformKeys = Object.keys(newBalances);
     
@@ -153,29 +155,50 @@ export const MainApp: React.FC<MainAppProps> = ({ currentUser, onLogout, onDelet
       coinBreakdown
     };
 
-    setAssetHistory(prev => [...prev, newHistoryRecord]);
+    setAssetHistory((prev) => {
+      const updatedHistory = [...prev, newHistoryRecord];
+      onDataChange({ balances: newBalances, assetHistory: updatedHistory });
+      return updatedHistory;
+    });
   };
 
   const handleAddPlatform = (name: string) => {
-    if (!balances[name]) {
-      setBalances(prev => ({ ...prev, [name]: [] }));
-    }
+    setBalances((prev) => {
+      if (prev[name]) {
+        return prev;
+      }
+      const updated = { ...prev, [name]: [] };
+      onDataChange({ balances: updated });
+      return updated;
+    });
   };
 
   const handleRemovePlatform = (name: string) => {
-    setBalances(prev => {
-      const newState = { ...prev };
-      delete newState[name];
-      return newState;
+    setBalances((prev) => {
+      if (!prev[name]) {
+        return prev;
+      }
+      const updated = { ...prev };
+      delete updated[name];
+      onDataChange({ balances: updated });
+      return updated;
     });
   };
 
   const handleEditHistory = (updatedRecord: AssetHistoryRecord) => {
-    setAssetHistory(prev => prev.map(h => h.id === updatedRecord.id ? updatedRecord : h));
+    setAssetHistory((prev) => {
+      const updated = prev.map((h) => (h.id === updatedRecord.id ? updatedRecord : h));
+      onDataChange({ assetHistory: updated });
+      return updated;
+    });
   };
 
   const handleDeleteHistory = (id: string) => {
-    setAssetHistory(prev => prev.filter(h => h.id !== id));
+    setAssetHistory((prev) => {
+      const updated = prev.filter((h) => h.id !== id);
+      onDataChange({ assetHistory: updated });
+      return updated;
+    });
   };
 
   const renderContent = () => {

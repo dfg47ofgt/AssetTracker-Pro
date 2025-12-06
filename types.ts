@@ -49,3 +49,10 @@ export enum TabView {
   ASSETS = 'ASSETS',
   HISTORY = 'HISTORY'
 }
+
+export interface AppData {
+  users: UserProfile[];
+  deposits: Record<string, DepositRecord[]>;
+  balances: Record<string, PlatformBalances>;
+  history: Record<string, AssetHistoryRecord[]>;
+}
