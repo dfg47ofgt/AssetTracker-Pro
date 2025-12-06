@@ -37,7 +37,7 @@ export const AssetHistory: React.FC<AssetHistoryProps> = ({
 
   // Find all unique coins ever recorded to generate chart lines
   const allCoins = Array.from(new Set(history.flatMap(h => Object.keys(h.coinBreakdown || {}))));
-  allCoins.sort((a, b) => {
+  allCoins.sort((a: string, b: string) => {
     if (a === 'USDT' || a === 'TWD' || a === 'USD') return -1;
     return a.localeCompare(b);
   });
@@ -77,7 +77,7 @@ export const AssetHistory: React.FC<AssetHistoryProps> = ({
   const handleSaveEdit = () => {
     if (editingRecord && editDateInput) {
       // Recalculate total based on platform breakdown edit
-      const newTotal = Object.values(editingRecord.platformBreakdown).reduce((a, b) => a + b, 0);
+      const newTotal = Object.values(editingRecord.platformBreakdown).reduce((a: number, b: number) => a + b, 0);
       
       // Calculate new timestamp and date string from the date picker
       const newDateObj = new Date(editDateInput);

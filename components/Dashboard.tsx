@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { DepositRecord, PlatformBalances, AssetHistoryRecord, InvestmentType } from '../types';
+import { DepositRecord, PlatformBalances, AssetHistoryRecord, InvestmentType, Asset } from '../types';
 import { StatCard } from './StatCard';
 import { analyzePortfolioWithGemini } from '../services/geminiService';
 import { ArrowUpRight, ArrowDownRight, Wallet, TrendingUp, Sparkles, PieChart as PieChartIcon, Coins } from 'lucide-react';
@@ -56,7 +56,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
      
      // 2. Build Allocation Data from Current Balances (Reactive)
      // Aggregating all assets across all platforms
-     Object.values(balances).flat().forEach(asset => {
+     Object.values(balances).flat().forEach((asset: Asset) => {
          const coin = asset.coin.trim().toUpperCase() || '未知';
          currentCoinBreakdown[coin] = (currentCoinBreakdown[coin] || 0) + (Number(asset.value) || 0);
      });
@@ -95,7 +95,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const handleAiAnalysis = async () => {
     setIsLoadingAi(true);
-    const result = await analyzePortfolioWithGemini(deposits, balances, currency, investmentType);
+    const result = await analyzePortfolioWithGemini(deposits, balances, currency, investmentType as InvestmentType);
     setAiAnalysis(result);
     setIsLoadingAi(false);
   };
@@ -114,6 +114,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </text>
     );
   };
+
+  // Prepare custom payload for Bar Chart Legend
+  const barLegendPayload = barData.map((item, index) => ({
+    value: item.name,
+    type: 'rect',
+    id: item.name,
+    color: index === 0 ? '#64748b' : (isProfit ? '#10b981' : '#f43f5e'),
+    payload: { value: item.amount }
+  }));
 
   return (
     <div className="space-y-8">
@@ -171,6 +180,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc' }}
                   formatter={(value: number) => [`${currencySymbol}${value.toLocaleString()}`, '金額']}
                 />
+                <Legend 
+                    payload={barLegendPayload}
+                    verticalAlign="bottom" 
+                    height={80}
+                    content={({ payload }) => (
+                        <ul className="flex flex-wrap justify-center gap-4 text-sm mt-4">
+                        {payload?.map((entry: any, index: number) => (
+                            <li key={`item-${index}`} className="flex items-center text-slate-300">
+                            <span className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: entry.color }}></span>
+                            {entry.value}: <span className="font-mono ml-1 font-bold text-white">{currencySymbol}{(entry.payload?.value || 0).toLocaleString()}</span>
+                            </li>
+                        ))}
+                        </ul>
+                    )} 
+                />
                 <Bar dataKey="amount" radius={[0, 4, 4, 0]} barSize={40}>
                     {barData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={index === 0 ? '#64748b' : (isProfit ? '#10b981' : '#f43f5e')} />
@@ -219,7 +243,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 {payload?.map((entry: any, index: number) => (
                                   <li key={`item-${index}`} className="flex items-center text-slate-300">
                                     <span className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: entry.color }}></span>
-                                    {entry.value}: <span className="font-mono ml-1 font-bold text-white">{currencySymbol}{entry.payload.value.toLocaleString()}</span>
+                                    {entry.value}: <span className="font-mono ml-1 font-bold text-white">{currencySymbol}{(entry.payload?.value || 0).toLocaleString()}</span>
                                   </li>
                                 ))}
                               </ul>

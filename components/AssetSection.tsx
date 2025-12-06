@@ -402,11 +402,11 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
                             verticalAlign="bottom" 
                             height={80}
                             content={({ payload }) => (
-                              <ul className="flex flex-wrap justify-center gap-4 text-sm mt-4">
+                              <ul className="flex flex-wrap justify-center gap-4 text-base mt-4">
                                 {payload?.map((entry: any, index: number) => (
                                   <li key={`item-${index}`} className="flex items-center text-slate-300">
                                     <span className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: entry.color }}></span>
-                                    {entry.value}: <span className="font-mono ml-1 font-bold text-white">{currencySymbol}{entry.payload.value.toLocaleString()}</span>
+                                    {entry.value}: <span className="font-mono ml-1 font-bold text-white">{currencySymbol}{(entry.payload?.value || 0).toLocaleString()}</span>
                                   </li>
                                 ))}
                               </ul>
@@ -452,11 +452,11 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
                             verticalAlign="bottom" 
                             height={80}
                             content={({ payload }) => (
-                              <ul className="flex flex-wrap justify-center gap-4 text-sm mt-4">
+                              <ul className="flex flex-wrap justify-center gap-4 text-base mt-4">
                                 {payload?.map((entry: any, index: number) => (
                                   <li key={`item-${index}`} className="flex items-center text-slate-300">
                                     <span className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: entry.color }}></span>
-                                    {entry.value}: <span className="font-mono ml-1 font-bold text-white">{currencySymbol}{entry.payload.value.toLocaleString()}</span>
+                                    {entry.value}: <span className="font-mono ml-1 font-bold text-white">{currencySymbol}{(entry.payload?.value || 0).toLocaleString()}</span>
                                   </li>
                                 ))}
                               </ul>

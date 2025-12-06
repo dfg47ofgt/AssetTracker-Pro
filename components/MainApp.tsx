@@ -310,8 +310,8 @@ export const MainApp: React.FC<MainAppProps> = ({ currentUser, onLogout, onDelet
                     </nav>
                 </div>
 
-                {/* User Info Dropdown - Outside scrollable area */}
-                <div className="relative border-l border-slate-700 pl-3 ml-1 flex-shrink-0" ref={userMenuRef}>
+                {/* User Info Dropdown - Outside scrollable area, High Z-Index */}
+                <div className="relative border-slate-700 sm:border-l sm:pl-3 sm:ml-1 flex-shrink-0" ref={userMenuRef}>
                     <button 
                         onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                         className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-800 transition-colors group"
@@ -326,9 +326,9 @@ export const MainApp: React.FC<MainAppProps> = ({ currentUser, onLogout, onDelet
                         <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
                     </button>
 
-                    {/* Dropdown Menu */}
+                    {/* Dropdown Menu - Fixed Z-Index and positioning */}
                     {isUserMenuOpen && (
-                        <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
+                        <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-[100]">
                             <div className="p-3 border-b border-slate-700/50 bg-slate-900/30">
                                 <p className="text-xs text-slate-500 font-medium">目前使用者</p>
                                 <p className="text-sm font-bold text-white truncate">{currentUser.name}</p>

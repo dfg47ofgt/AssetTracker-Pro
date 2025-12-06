@@ -1,8 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { DepositRecord, PlatformBalances, InvestmentType } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 const calculateTotal = (assets: any[]) => {
   if (!assets || !Array.isArray(assets)) return 0;
   return assets.reduce((sum, a) => sum + (a.value || 0), 0);
@@ -14,6 +12,15 @@ export const analyzePortfolioWithGemini = async (
   currency: string = 'USDT',
   investmentType: InvestmentType = 'CRYPTO'
 ): Promise<string> => {
+  // Initialize AI client lazily to prevent crash on app startup if env var is missing
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.warn("API_KEY is missing.");
+    return "請確認您的環境變數中已設定 API_KEY，才能使用 AI 分析功能。";
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+
   const totalDeposited = deposits.reduce((sum, d) => sum + d.amount, 0);
   
   // Dynamic platform calculation
@@ -80,6 +87,6 @@ export const analyzePortfolioWithGemini = async (
     return response.text || "暫時無法生成分析報告。";
   } catch (error) {
     console.error("Gemini analysis error:", error);
-    return "連線 AI 分析服務時發生錯誤，請檢查您的 API 金鑰。";
+    return "連線 AI 分析服務時發生錯誤，請檢查您的 API 金鑰是否有效。";
   }
 };
